@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <!-- Make the page mobile compatible -->
+        <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height, target-densitydpi=device-dpi, viewport-fit=cover"/>
+        <!--<meta http-equiv="Content-Security-Policy" content="default-src *; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'" />-->
+        <title>dsPhoneGap app</title>
+
+        <!-- CSS only -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+
+        <!-- Script -->
+        <script type="text/javascript" src="cordova.js" ></script>
+        <script type='text/javascript' src='jquery-3.0.0.js' ></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.5.0/viewer.min.js"></script>
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.5.0/viewer.min.css">
+
+        <script type='text/javascript'>
+
+        $(document).ready(function(){
+
+            $('#upload-status').hide();
+            getImage();
+
+            function addImage(url, quality){
+                $('#group-list').append('<li class="list-group-item d-flex justify-content-between align-items-center">\n' +
+                    '                            <div class="row">Image quality: '+quality+''+'\n' +
+                    '                            <div class="image-parent pop">\n' +
+                    '                                <img class="gallery-items" style="width: 100%;" src='+url+' class="img-fluid" alt="quixote">\n' +
+                    '                            </div>'+'</div>'+'\n' +
+                    '                        </li>');
+            };
+
+            function getImage(){
+                fetch('https://api.saigoneco.com.vn/api/getImageList').then(async (rs)=>{
+                    let data = (await (rs.json()));
+                    for(let i=0;i<data.data.length;i++){
+                        addImage(data.data[i].image_url, data.data[i].quality);
+                    }
+
+                    new Viewer(document.getElementById('group-list'));
+
+                    $('#loading-status').hide();
+                }, (err)=>{
+                    console.log(err)
+                })
+            };
+
+            // take picture from camera
+            $('#but_take').click(function(){
+                //addImage("https://api.saigoneco.com.vn/uploads/phpFLv6s6.png", $('#m').val())
+                navigator.camera.getPicture(onSuccess, onFail, { quality: $('#m').val(),
+                    destinationType: Camera.DestinationType.FILE_URL,
+                    correctOrientation: true
+                });
+            });
+
+            // upload select
+            $("#but_select").click(function(){
+                navigator.camera.getPicture(onSuccess, onFail, { quality: $('#m').val(),
+                    sourceType: Camera.PictureSourceType.PHOTOLIBRARY,
+                    destinationType: Camera.DestinationType.FILE_URI,
+                    correctOrientation: true
+                });
+
+            });
+
+            // Change image source and upload photo to server
+            function onSuccess(imageURI) {
+
+                // Set image source
+                var image = document.getElementById('img');
+                image.src = imageURI  + '?' + Math.random();
+
+                var options = new FileUploadOptions();
+                options.fileKey = "file";
+                options.fileName = imageURI.substr(imageURI.lastIndexOf('/') + 1);
+                options.mimeType = "image/jpeg";
+
+                var params = {};
+                params.value1 = "test";
+                params.quality = $('#m').val();
+
+                options.params = params;
+                options.chunkedMode = false;
+
+                $('#upload-status').show();
+                var ft = new FileTransfer();
+                ft.upload(imageURI, "https://api.saigoneco.com.vn/api/uploadImage", function(result){
+                    //alert('successfully uploaded ' + result.response);
+
+                    let rs = JSON.parse(result.response);
+
+                    alert(`Upload successfully: ${rs.data}`)
+
+                    addImage(rs.data, $('#m').val());
+
+                    $('#upload-status').hide();
+
+                    new Viewer(document.getElementById('group-list'));
+
+
+                }, function(error){
+                    alert('error : ' + JSON.stringify(error));
+                    $('#upload-status').hide()
+                }, options);
+
+            }
+
+            function onFail(message) {
+                alert('Failed because: ' + message);
+                $('#upload-status').hide()
+            }
+
+        });
+
+        </script>
+    </head>
+    <body>
+
+		<div style="margin:0 auto; width:80%!important;text-align: center;">
+			<img src="img/cam2.jpg" id='img' style="width: 100px; height: 100px;margin-bottom: 5px;">
+            <div class="row">
+                <label for="m" class="col-2">Image quality</label>
+                <div class="col-10">
+                    <input type="number" id="m" placeholder="Input image quality" value="100" style="border: 1px solid grey;padding: 15px;"/>
+                </div>
+            </div>
+
+            <div id="upload-status" class="row" style="margin-top: 20px;">
+                <div class="col-12">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <span>Uploading...</span>
+                </div>
+            </div>
+
+        </div><br/>
+        <div style="width:100%; text-align:center; padding:10px;">
+
+            <button id='but_take' class="btn btn-primary">Take photo</button>
+            <button id='but_select' class="btn btn-primary">Select photo from Gallery</button>
+
+        </div>
+
+        <div class="container">
+            <div class="row">
+                <div class="col-12 col-sm-8 col-lg-5">
+                    <h6 class="text-muted">Uploaded images</h6>
+                    <div id="loading-status" class="row" style="margin-top: 20px;">
+                        <div class="col-12">
+                            <div class="spinner-border" role="status">
+                                <span class="sr-only">Loading...</span>
+                            </div>
+                            <span>Loading...</span>
+                        </div>
+                    </div>
+                    <ul id="group-list" class="list-group">
+
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="imagemodal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-body">
+                        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+                        <img src="" class="imagepreview" style="width: 100%;" >
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </body>
+</html>
